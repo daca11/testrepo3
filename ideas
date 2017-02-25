@@ -1,0 +1,26 @@
+poner x frames antes, luego ejecutar makemovie (petición get http)
+
+-- pre_capture poner x segundos antes
+-- event_gap=0 > el video se para inmediatamente si no hay movimiento
+-- post_capture poner x segundos después
+-- detection pause (http config) o bien motion -m
+
+--> makemovie creará un video de 5 + 0 + 5
+
+
+/var/lib/motion --> los archivos van por defecto aqui
+/etc/motion/motion.conf --> configuración por defecto
+
+--> estoy usando motion v3.2.12
+
+
+
+
+---------> bug > conectar almenos 2 cámaras
+-> comenzar con motion -m (no detección de movimiento), + gap = 0
+-> cuando se detecte colisión -> emulate_motion = on
+-> decirle que emule movimiento y que gap=0
+--> makemovie es para parar el anterior y hacer uno nuevo
+
+
+están escribiendo los dos en el mismo sitio... thread 0 con un nombre de fichero distinto
