@@ -71,30 +71,33 @@ def killProcess(process):
 if __name__ == '__main__':
     p = None
 
-    observer = Observer()
-    # schedule a watcher for each camera
-    for num_cam in xrange(1, CAMERAS + 1):
-        observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
-    observer.start()
-
     try:
         while True:
-            newEvent = False
-
             archiveFiles()
 
+            newEvent = False
+
+            observer = Observer()
+            # schedule a watcher for each camera
+            for num_cam in xrange(1, CAMERAS + 1):
+                observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
+            observer.start()
             print "Starting to record..."
 
             p = subprocess.Popen("motion -m -c " + os.path.join(MOTION_ROOT_DIR, "configuration", "motion.conf"),
                                  shell=True, preexec_fn=os.setsid)
 
             while not newEvent:
-                key = sys.stdin.read()
+                key = sys.stdin.read(1)
                 if key == "q":
                     newEvent = True
-                    print "New event! starting 1min countdown"
-                    time.sleep(60)
+                    print "New event! starting 1min countdown and stopping observers"
+                    observer.stop()
+                    observer.join()
+                    time.sleep(5)
                     print "Stopping motion..."
+                    # TODO: don't kill motion, disable emulate motion + reset event? (optional)
+                    # killing causes video device busy and skip seconds of recording
                     killProcess(p)
 
     finally:
