@@ -1,7 +1,7 @@
+import sys
 from collections import deque
 
 import cv2
-import sys
 
 fps = 15
 

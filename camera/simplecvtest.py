@@ -1,10 +1,6 @@
-from SimpleCV import Image, Camera, VideoStream
-
-# cam = Camera()
-# img = cam.getImage()
-# #img.save("filename.jpg")
-
 import time
+
+from SimpleCV import Camera, VideoStream
 c = Camera()
 vs = VideoStream("out.avi", fps=10)
 

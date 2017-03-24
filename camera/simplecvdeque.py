@@ -1,6 +1,6 @@
-from SimpleCV import Image, Camera, VideoStream
 import time
-from collections import deque
+
+from SimpleCV import Camera, VideoStream
 
 secondsBuffer = 10
 secondsToRecord = 60
