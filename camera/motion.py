@@ -1,6 +1,5 @@
 import glob
 import os
-import signal
 import subprocess
 import sys
 import time
@@ -68,58 +67,59 @@ class CamRecorder:
                 os.rename(cam_dir + "/" + file, new_dir + "/" + file)
 
     def runProcess(self):
-        self.process = subprocess.Popen(
+        # self.process = subprocess.Popen(
+        #     "motion -m -c " + os.path.join(MOTION_ROOT_DIR, "configuration", "motion.conf"),
+        #     shell=True, preexec_fn=os.setsid)
+        subprocess.Popen(
             "motion -m -c " + os.path.join(MOTION_ROOT_DIR, "configuration", "motion.conf"),
-            shell=True, preexec_fn=os.setsid)
+            shell=True)
 
 
     def killProcess(self):
-        os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+        # os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+        os.system("killall -9 motion")
+        # observer.stop() #is it required?
+        # observer.join()
 
     def pause(self):
         # disable emulate motion + reset event? (optional: kill -1 'pid-of-motion')
-        urllib2.urlopen("http://localhost:8080/foo/bar").read()
+        urllib2.urlopen("http://localhost:8080/0/config/set?emulate_motion=off").read()
 
     def resume(self):
-        urllib2.urlopen("http://localhost:8080/foo/bar").read()
+        urllib2.urlopen("http://localhost:8080/0/config/set?emulate_motion=on").read()
 
     def start(self):
         firstRun = True
 
-        try:
-            while True:
-                self.archiveFiles()
+        while True:
+            self.archiveFiles()
 
-                newEvent = False
+            newEvent = False
 
-                observer = Observer()
-                # schedule a watcher for each camera
-                for num_cam in xrange(1, CAMERAS + 1):
-                    observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
-                observer.start()
-                print "Starting to record..."
+            observer = Observer()
+            # schedule a watcher for each camera
+            for num_cam in xrange(1, CAMERAS + 1):
+                observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
+            observer.start()
+            print "Starting to record..."
 
-                if firstRun:
-                    self.runProcess()
-                else:
-                    self.resume()
+            if firstRun:
+                self.runProcess()
+                firstRun = False
+            else:
+                self.resume()
 
-                while not newEvent:
-                    key = sys.stdin.read(1)
-                    if key == "q":
-                        newEvent = True
-                        print "New event! starting 1min countdown and stopping observers" # TODO: param seconds of countdown...
-                        observer.stop()
-                        observer.join()
-                        time.sleep(5)
-                        print "Pausing motion..."
-                        # killing causes video device busy and skip seconds of recording
-                        # self.killProcess()
-                        self.pause()
+            while not newEvent:
+                key = sys.stdin.read(1)
+                if key == "q":
+                    newEvent = True
+                    print "New event! starting 1min countdown and stopping observers" # TODO: param seconds of countdown...
+                    observer.stop()
+                    observer.join()
+                    time.sleep(5)
+                    print "Pausing motion..."
+                    # killing causes video device busy and skip seconds of recording
+                    # self.killProcess()
+                    self.pause()
 
-        finally:
-            print "HALTING DOWN!"
-            self.killProcess()
-            observer.stop()
-            observer.join()
-            print "HALTED!"
+
