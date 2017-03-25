@@ -9,13 +9,11 @@ def camRecorderThread(camRecorder):
     camRecorder.start()
 
 
-def obdThread():
-    logitems = ["rpm", "speed", "throttle_pos", "load", "fuel_status"]
-    o = OBD_Recorder('/home/pi/obdfiles/', logitems)
-    o.connect()
+def obdThread(obdRecorder):
+    obdRecorder.connect()
     attempts = 1
 
-    while not o.is_connected():
+    while not obdRecorder.is_connected():
         if attempts % 10 == 0:
             print "Not connected. Retrying in 10 secs..."
             time.sleep(10)
@@ -23,9 +21,9 @@ def obdThread():
             print "Not connected. Retrying in 1 sec..."
             time.sleep(1)
         attempts += 1
-        o.connect()
+        obdRecorder.connect()
 
-    o.record_data()
+    obdRecorder.record_data()
 
 if __name__ == '__main__':
     try:
@@ -35,7 +33,9 @@ if __name__ == '__main__':
         th = threading.Thread(target=camRecorderThread, args=(cam,))
         threads.append(th)
 
-        th = threading.Thread(target=obdThread, args=())
+        logitems = ["rpm", "speed", "throttle_pos", "load", "fuel_status"]
+        obd = OBD_Recorder('/home/pi/obdfiles/', logitems)
+        th = threading.Thread(target=obdThread, args=(obd)) # TODO: join obd+gps>send json into the same thread?
         threads.append(th)
 
         # Ejecutamos todos los procesos
@@ -48,5 +48,6 @@ if __name__ == '__main__':
 
     finally:
         print "HALTING DOWN!"
-        cam.killProcess()
+        cam.killProcess() # Kill motion to stop recording
+        obd.closeFile() # Flush obd log_file
         print "HALTED!"
