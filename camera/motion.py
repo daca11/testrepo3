@@ -77,7 +77,7 @@ class CamRecorder:
 
     def killProcess(self):
         # os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-        os.system("killall -9 motion")
+        os.system("killall -g -KILL motion")
         # observer.stop() #is it required?
         # observer.join()
 
@@ -111,7 +111,7 @@ class CamRecorder:
 
             while not newEvent:
                 key = sys.stdin.read(1)
-                if key == "q":
+                if key[0] == "q":
                     newEvent = True
                     print "New event! starting 1min countdown and stopping observers" # TODO: param seconds of countdown...
                     observer.stop()

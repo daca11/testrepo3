@@ -14,7 +14,7 @@ class OBD_Recorder():
         self.sensorlist = []
         localtime = time.localtime(time.time())
         filename = path+"car-"+str(localtime[0])+"-"+str(localtime[1])+"-"+str(localtime[2])+"-"+str(localtime[3])+"-"+str(localtime[4])+"-"+str(localtime[5])+".txt"
-        self.log_file = open(filename, "w", 128) # TODO: flush on newline?
+        self.log_file = open(filename, "w", 0) # TODO: flush on newline?
         self.log_file.write("Time,RPM,MPH,Throttle,Load,Fuel Status\n");
 
         for item in log_items:
