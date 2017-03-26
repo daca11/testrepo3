@@ -4,7 +4,7 @@ from gps import gps, WATCH_ENABLE
 class GpsPoller:
     def __init__(self):
         self.poller = gps(mode=WATCH_ENABLE)
-        self.logfile = open("/home/pi/gpsfiles/locations.txt", "a")  # TODO: append time+gpstime from fix.xxxx
+        self.logfile = open("/home/pi/gpsfiles/locations.txt", "a", 0)  # TODO: append time+gpstime from fix.xxxx
         self.attempts = 0
 
     def writeNext(self):
