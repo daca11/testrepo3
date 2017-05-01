@@ -12,31 +12,41 @@ def camRecorderThread(camRecorder):
 
 
 def obdThread(obdRecorder):
+    global obdSlot
+
     obdRecorder.connect()
     attempts = 1
 
-    while not obdRecorder.is_connected():
-        if attempts % 10 == 0:
-            print "Not connected. Retrying in 10 secs..."
-            time.sleep(10)
-        else:
-            print "Not connected. Retrying in 1 sec..."
-            time.sleep(1)
-        attempts += 1
-        obdRecorder.connect()
+    while True:
+        if not obdRecorder.is_connected():
+            obdSlot = "Not connected!"
 
-    obdRecorder.record_data()
+            if attempts % 10 == 0:
+                print "Not connected. Retrying in 10 secs..."
+                time.sleep(10)
+            else:
+                print "Not connected. Retrying in 1 sec..."
+                time.sleep(1)
+            attempts += 1
+            obdRecorder.connect()
+        else:
+            obdSlot = obdRecorder.record_data()
 
 
 def gpsThread(gpsPoller):
+    global gpsSlot
+
     while True:
-        gpsPoller.writeNext()
+        gpsSlot = gpsPoller.writeNext()
 
 # TODO: catch exception in threads and rethrow in main thread (bucket queue?)
 
 if __name__ == '__main__':
     try:
         threads = []
+
+        gpsSlot = "no gps data"
+        obdSlot = "no obd data"
 
         cam = CamRecorder()
         th = threading.Thread(target=camRecorderThread, args=(cam,)) # TODO: configure as a daemon...
@@ -48,12 +58,18 @@ if __name__ == '__main__':
 
         logitems = ["rpm", "speed", "throttle_pos", "load", "fuel_status"]
         obd = OBD_Recorder('/home/pi/obdfiles/', logitems)
-        th = threading.Thread(target=obdThread, args=(obd,))  # TODO: join obd+gps>send json into the same thread?
+        th = threading.Thread(target=obdThread, args=(obd,))
         threads.append(th)
 
         # Ejecutamos todos los procesos
         for t in threads:
             t.start()
+
+        while True:
+            print "Gps: " + gpsSlot
+            print "OBD: " + obdSlot
+            # TODO: send as rest message in a separate new thread --> handle errors (queue unsent msgs?)
+            time.sleep(1)
 
         # Esperamos a que se completen todos los procesos
         for t in threads:

@@ -55,17 +55,18 @@ class OBD_Recorder():
         
         print "Logging started"
         
-        while 1:
-            log_string = str(datetime.now())
-            # results = {}
-            for index in self.sensorlist:
-                (name, value, unit) = self.port.sensor(index)
-                log_string = log_string + ","+str(value)
-                # results[obd_sensors.SENSORS[index].shortname] = value;
+        #while 1:
+        log_string = str(datetime.now())
+        # results = {}
+        for index in self.sensorlist:
+            (name, value, unit) = self.port.sensor(index)
+            log_string = log_string + ","+str(value)
+            # results[obd_sensors.SENSORS[index].shortname] = value;
 
-            # gear = self.calculate_gear(results["rpm"], results["speed"])
-            # log_string = log_string #+ "," + str(gear)
-            self.log_file.write(log_string+"\n")
+        # gear = self.calculate_gear(results["rpm"], results["speed"])
+        # log_string = log_string #+ "," + str(gear)
+        self.log_file.write(log_string+"\n")
+        return log_string
 
             
     def calculate_gear(self, rpm, speed):

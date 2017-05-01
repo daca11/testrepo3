@@ -14,10 +14,12 @@ class GpsPoller:
                 print "Waiting gps..."
 
             self.attempts += 1
+            return "No fix!"
         else:
-            print "Position: (" + str(self.poller.fix.latitude) + ", " + str(self.poller.fix.longitude) + ")"
+            print "Position fix!"
             self.logfile.write("%s,%s\n" % (self.poller.fix.latitude, self.poller.fix.longitude))
             self.attempts = 0
+            return "Position: (" + str(self.poller.fix.latitude) + ", " + str(self.poller.fix.longitude) + ")"
 
     def closeFile(self):
         self.logfile.close()
