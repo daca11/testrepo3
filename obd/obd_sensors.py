@@ -136,7 +136,15 @@ class Sensor:
         self.value= sensorValueFunction
         self.unit = u
 
-SENSORS = [
+class SensorIndexEnum:
+    def __init__(self):
+        self.rpm = 12
+        self.speed = 13
+        self.throttle = 17
+        self.load = 4
+        self.fuel = 3
+
+SENSORS = [ # TODO: add dtc pids
     Sensor("pids"                  , "Supported PIDs"				, "0100" , hex_to_bitstring ,""       ), 
     Sensor("dtc_status"            , "S-S DTC Cleared"				, "0101" , dtc_decrypt      ,""       ),    
     Sensor("dtc_ff"                , "DTC C-F-F"					, "0102" , cpass            ,""       ),      

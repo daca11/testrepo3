@@ -6,19 +6,19 @@ from datetime import datetime
 import obd_io
 import obd_sensors
 from obd_utils import scanSerial
+from rest.objects import ObdObject
 
 
 class OBD_Recorder():
-    def __init__(self, path, log_items):
+    def __init__(self):
         self.port = None
-        self.sensorlist = []
         localtime = time.localtime(time.time())
-        filename = path+"car-"+str(localtime[0])+"-"+str(localtime[1])+"-"+str(localtime[2])+"-"+str(localtime[3])+"-"+str(localtime[4])+"-"+str(localtime[5])+".txt"
+        filename = '/home/pi/obdfiles/'+"car-"+str(localtime[0])+"-"+str(localtime[1])+"-"+str(localtime[2])+"-"+str(localtime[3])+"-"+str(localtime[4])+"-"+str(localtime[5])+".txt"
         self.log_file = open(filename, "w", 0) # TODO: flush on newline?
-        self.log_file.write("Time,RPM,MPH,Throttle,Load,Fuel Status\n");
+        self.log_file.write("Time,RPM,MPH,Throttle,Load,Fuel Status\n")
 
-        for item in log_items:
-            self.add_log_item(item)
+        # for item in ["rpm", "speed", "throttle_pos", "load", "fuel_status"]:
+        #     self.add_log_item(item)
 
         self.gear_ratios = [34/13, 39/21, 36/23, 27/20, 26/21, 25/22]
         #log_formatter = logging.Formatter('%(asctime)s.%(msecs).03d,%(message)s', "%H:%M:%S")
@@ -41,32 +41,49 @@ class OBD_Recorder():
     def is_connected(self):
         return self.port
         
-    def add_log_item(self, item):
-        for index, e in enumerate(obd_sensors.SENSORS):
-            if(item == e.shortname):
-                self.sensorlist.append(index)
-                print "Logging item: "+e.name
-                break
+    # def add_log_item(self, item):
+    #     for index, e in enumerate(obd_sensors.SENSORS):
+    #         if(item == e.shortname):
+    #             self.sensorlist.append(index)
+    #             print "Logging item: "+e.name
+    #             break
             
             
     def record_data(self):
         if(self.port is None):
-            return None
+            return ObdObject()
         
         print "Logging started"
         
         #while 1:
         log_string = str(datetime.now())
         # results = {}
-        for index in self.sensorlist:
-            (name, value, unit) = self.port.sensor(index)
-            log_string = log_string + ","+str(value)
+
+        sensorIndexEnum = obd_sensors.SensorIndexEnum()
+
+        obdObject = ObdObject()
+        obdObject.rpm = self.port.get_sensor_value(obd_sensors.SENSORS[sensorIndexEnum.rpm])
+        obdObject.speed = self.port.get_sensor_value(obd_sensors.SENSORS[sensorIndexEnum.speed])
+        obdObject.throttle = self.port.get_sensor_value(obd_sensors.SENSORS[sensorIndexEnum.throttle])
+        obdObject.load = self.port.get_sensor_value(obd_sensors.SENSORS[sensorIndexEnum.load])
+        obdObject.fuel = self.port.get_sensor_value(obd_sensors.SENSORS[sensorIndexEnum.fuel])
+
+        # for index in self.sensorIndexList:
+        #     (name, value, unit) = self.port.sensor(index)
+        #     log_string = log_string + ","+str(value)
             # results[obd_sensors.SENSORS[index].shortname] = value;
 
         # gear = self.calculate_gear(results["rpm"], results["speed"])
         # log_string = log_string #+ "," + str(gear)
-        self.log_file.write(log_string+"\n")
-        return log_string
+
+        #write to log
+        self.log_file.write(obdObject.rpm + "," +
+                            obdObject.speed + "," +
+                            obdObject.throttle + "," +
+                            obdObject.load + "," +
+                            obdObject.fuel + "\n")
+
+        return obdObject
 
             
     def calculate_gear(self, rpm, speed):

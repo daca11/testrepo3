@@ -1,5 +1,7 @@
 from gps import gps, WATCH_ENABLE
 
+from rest.objects import GpsObject
+
 
 class GpsPoller:
     def __init__(self):
@@ -14,12 +16,15 @@ class GpsPoller:
                 print "Waiting gps..."
 
             self.attempts += 1
-            return "No fix!"
+            return GpsObject()
         else:
-            print "Position fix!"
-            self.logfile.write("%s,%s\n" % (self.poller.fix.latitude, self.poller.fix.longitude))
+            gpsObject = GpsObject(self.poller.fix.latitude, self.poller.fix.longitude)
+            print "Position: (" + str(gpsObject.lat) + ", " + str(gpsObject.lng) + ")"
+            self.logfile.write("%s,%s\n" % (gpsObject.lat, gpsObject.lng))
             self.attempts = 0
-            return "Position: (" + str(self.poller.fix.latitude) + ", " + str(self.poller.fix.longitude) + ")"
+            return gpsObject
+
+
 
     def closeFile(self):
         self.logfile.close()
