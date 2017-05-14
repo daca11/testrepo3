@@ -1,4 +1,4 @@
-from gps import gps, WATCH_ENABLE
+from gps import gps, WATCH_ENABLE, math
 
 from rest.objects import GpsObject
 
@@ -11,12 +11,13 @@ class GpsPoller:
 
     def writeNext(self):
         self.poller.next()
-        if self.poller.fix.latitude == 0.0 and self.poller.fix.longitude == 0.0:
+        if (self.poller.fix.latitude == 0.0 and self.poller.fix.longitude == 0.0)\
+                or math.isnan(self.poller.fix.latitude) or math.isnan(self.poller.fix.longitude):
             if self.attempts % 10 == 0:
                 print "Waiting gps..."
 
             self.attempts += 1
-            return GpsObject()
+            return None
         else:
             gpsObject = GpsObject(self.poller.fix.latitude, self.poller.fix.longitude)
             print "Position: (" + str(gpsObject.lat) + ", " + str(gpsObject.lng) + ")"
