@@ -11,10 +11,11 @@ from obd.obd_recorder import OBD_Recorder
 from position.gpsPoller import GpsPoller
 from rest.objects import LogMessage, Trip
 
-WS_URI = 'http://192.168.1.108:8080/autologger/rest/'  # TODO: switch local/global ip
+WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
+CURRENT_WS_URI_ID = 0
+WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
-RETRY_ATTEMPS = 5
 
 def camRecorderThread(camRecorder):
     camRecorder.start()
@@ -55,12 +56,16 @@ def postMessages():
     """ Sends pending rest messages in the queue to the rest WS """
 
     global logMessages
+    global CURRENT_WS_URI_ID
+    global WS_URI
+    global WS_URIS
+
     attempts = 0
     tripId = None
 
     # request a trip id
 
-    while tripId is None and attempts < RETRY_ATTEMPS:
+    while tripId is None:
         print "Requesting trip id..."
 
         try:
@@ -70,7 +75,7 @@ def postMessages():
                 tripId = r.text
                 attempts = 0
 
-                while attempts < RETRY_ATTEMPS:
+                while True:
                     try:
                         if len(logMessages) != 0:
                             logMsg = logMessages[0]
@@ -81,26 +86,23 @@ def postMessages():
                                 logMessages.pop()
                                 attempts = 0
                             else:
-                                attempts = failAttempt(attempts, r.status_code)
+                                attempts = failAttempt(attempts, "Failed sending log to WS", r.status_code)
                     except:
-                        attempts = failAttempt(attempts, None, sys.exc_info())
-
-                print "Failed sending log to WS, logging locally only"
-
+                        attempts = failAttempt(attempts, "Failed sending log to WS", None, sys.exc_info())
             else:
-                attempts = failAttempt(attempts, r.status_code)
+                attempts = failAttempt(attempts, "Failed requesting tripId to WS", r.status_code)
         except:
-            attempts = failAttempt(attempts, None, sys.exc_info())
+            CURRENT_WS_URI_ID = 0 if CURRENT_WS_URI_ID == 1 else 1
+            WS_URI = WS_URIS[CURRENT_WS_URI_ID]
+            attempts = failAttempt(attempts, "Failed requesting tripId to WS", None, sys.exc_info())
 
-    print "Failed requesting tripId, logging locally only"
 
-
-def failAttempt(attempts, status, exception=None):
-    # failed get, retry in 5 secs
-    # after 5 failed attempts, do not send data to ws
+def failAttempt(attempts, message, status, exception=None):
+    # failed request, retry in 5 secs
 
     attempts += 1
     errorMsg = "Failed attempt " + str(attempts)
+    errorMsg += ", message: " + message
     if status is not None:
         errorMsg += ", status: " + str(status)
     if exception is not None:
@@ -120,8 +122,8 @@ if __name__ == '__main__':
 
         threads = []
 
-        gpsSlot = None # GpsObject()
-        obdSlot = None # ObdObject()
+        gpsSlot = None
+        obdSlot = None
 
         # Camera thread
         cam = CamRecorder()
