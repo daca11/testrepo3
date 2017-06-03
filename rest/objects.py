@@ -15,6 +15,13 @@ class ObdObject:
         self.load = load
         self.fuel = fuel
 
+    def toString(self):
+        return str(self.rpm) + "," + \
+               str(self.speed) + "," + \
+               str(self.throttle) + "," + \
+               str(self.load) + "," + \
+               str(self.fuel)
+
 
 class Trip:
     def __init__(self, tripId):

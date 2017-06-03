@@ -5,13 +5,14 @@ import traceback
 
 import requests
 
+import obd
 from camera.motion import CamRecorder
 from logger.filelogger import FileLogger
-from obd.obd_recorder import OBD_Recorder
+from obd.connector import Obd_Connector
 from position.gpsPoller import GpsPoller
-from rest.objects import LogMessage, Trip
+from rest.objects import LogMessage, Trip, ObdObject
 
-WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
+WS_URIS = ['http://192.168.1.107:8080/autologger/rest/','http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
 CURRENT_WS_URI_ID = 0
 WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
@@ -21,26 +22,49 @@ def camRecorderThread(camRecorder):
     camRecorder.start()
 
 
-def obdThread(obdRecorder):
+def obdThread(obdConnection):
     """ Gets the current obd sensors status """
 
     global obdSlot
 
-    obdRecorder.connect()
-    attempts = 1
+    obdConnection.runProcess()
+    obdRecorder = obd.Async("/dev/rfcomm0")
+    was_connected = False
 
     while True:
         if not obdRecorder.is_connected():
-            if attempts % 10 == 0:
-                print "OBD Not connected. Retrying in 10 secs..."
-                time.sleep(10)
-            else:
-                print "OBD Not connected. Retrying in 1 sec..."
-                time.sleep(1)
-            attempts += 1
-            obdRecorder.connect()
+            was_connected = False
+            print "OBD Not connected. Retrying in 10 secs..."
+            time.sleep(10)
+            obdConnection.runProcess()
+            obdRecorder = obd.Async("/dev/rfcomm0")
         else:
-            obdSlot = obdRecorder.record_data()
+            if not was_connected:
+                print "OBD Successfully connected!"
+                obdRecorder.watch(obd.commands.RPM)
+                obdRecorder.watch(obd.commands.SPEED)
+                obdRecorder.watch(obd.commands.THROTTLE_POS)
+                obdRecorder.watch(obd.commands.ENGINE_LOAD)
+                obdRecorder.watch(obd.commands.LONG_FUEL_TRIM_1)
+                obdRecorder.start()
+                was_connected = True
+
+
+            rpm = obdRecorder.query(obd.commands.RPM).value
+            speed = obdRecorder.query(obd.commands.SPEED).value
+            throttlepos = obdRecorder.query(obd.commands.THROTTLE_POS).value
+            engineload = obdRecorder.query(obd.commands.ENGINE_LOAD).value
+            fuellevel = obdRecorder.query(obd.commands.LONG_FUEL_TRIM_1).value
+
+
+            obdSlot = ObdObject(
+                rpm.magnitude if rpm is not None else None,
+                speed.magnitude if speed is not None else None,
+                throttlepos.magnitude if throttlepos is not None else None,
+                engineload.magnitude if engineload is not None else None,
+                fuellevel.magnitude if fuellevel is not None else None
+            )
+
 
 
 def gpsThread(gpsPoller):
@@ -83,7 +107,7 @@ def postMessages():
                             headers = {'content-type': 'application/json'}
                             r = requests.post(WS_URI, data=logMsg.toJSON(), headers=headers)
                             if r.status_code == 200:
-                                logMessages.pop()
+                                logMessages.pop(0)
                                 attempts = 0
                             else:
                                 attempts = failAttempt(attempts, "Failed sending log to WS", r.status_code)
@@ -136,8 +160,8 @@ if __name__ == '__main__':
         threads.append(th)
 
         # OBD thread
-        obd = OBD_Recorder()
-        th = threading.Thread(target=obdThread, args=(obd,))
+        obdConn = Obd_Connector()
+        th = threading.Thread(target=obdThread, args=(obdConn,))
         threads.append(th)
 
         # WS REST thread
@@ -156,6 +180,7 @@ if __name__ == '__main__':
                 # TODO: Serialize (pickle?), save in internal BD?, save in csv?, resend on reconnection?
                 # TODO: how to save tripId in local logs? (internal BD)
                 logger.log_file.write(message.toJSON() + "\n")  # save in json for now
+                print "OBDLOG: " + message.toJSON()
                 logMessages.append(message)
                 time.sleep(CHECK_INTERVAL)
 
@@ -165,5 +190,6 @@ if __name__ == '__main__':
         print "HALTING DOWN!"
         cam.killProcess()  # Kill motion to stop recording
         gpsp.closeFile()  # Flush gps logfile
-        obd.closeFile()  # Flush obd logfile
+        # obdConn.closeFile()  # Flush obd logfile
+        obdConn.killProcess()  # Disconnect from obd bt
         print "HALTED!"
