@@ -16,8 +16,6 @@ class Obd_Connector:
             "rfcomm connect hci0 00:1D:A5:15:9E:D3", #TODO: run as sudo python script because of this!
             shell=True)
 
-        print(self.process is None)
-
 
     def killProcess(self):
         os.killpg(os.getpgid(self.process.pid), signal.SIGINT)

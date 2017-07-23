@@ -20,7 +20,7 @@ class GpsPoller:
             return None
         else:
             gpsObject = GpsObject(self.poller.fix.latitude, self.poller.fix.longitude)
-            print "Position: (" + str(gpsObject.lat) + ", " + str(gpsObject.lng) + ")"
+            #print "Position: (" + str(gpsObject.lat) + ", " + str(gpsObject.lng) + ")"
             self.logfile.write("%s,%s\n" % (gpsObject.lat, gpsObject.lng))
             self.attempts = 0
             return gpsObject

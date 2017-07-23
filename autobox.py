@@ -12,7 +12,8 @@ from obd.connector import Obd_Connector
 from position.gpsPoller import GpsPoller
 from rest.objects import LogMessage, Trip, ObdObject
 
-WS_URIS = ['http://192.168.1.107:8080/autologger/rest/','http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
+#'http://192.168.42.13:8080/autologger/rest/',
+WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
 CURRENT_WS_URI_ID = 0
 WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
@@ -26,7 +27,7 @@ def obdThread(obdConnection):
     """ Gets the current obd sensors status """
 
     global obdSlot
-
+    #TODO: when load = 0 then re-run program?
     obdConnection.runProcess()
     obdRecorder = obd.Async("/dev/rfcomm0")
     was_connected = False
@@ -34,8 +35,8 @@ def obdThread(obdConnection):
     while True:
         if not obdRecorder.is_connected():
             was_connected = False
-            print "OBD Not connected. Retrying in 10 secs..."
-            time.sleep(10)
+            print "OBD Not connected. Retrying in 5 secs..."
+            time.sleep(5)
             obdConnection.runProcess()
             obdRecorder = obd.Async("/dev/rfcomm0")
         else:
