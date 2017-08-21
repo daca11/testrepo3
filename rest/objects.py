@@ -29,12 +29,12 @@ class Trip:
 
 
 class LogMessage:
-    def __init__(self, time, gps=None, obd=None):
+    def __init__(self, time, gps=None, obd=None, event=False):
         self.trip = None
         self.time = time
         self.gps = gps
         self.obd = obd
-        # TODO: event? How to send an event has been happened? Event number? None if no event?
+        self.event = event
 
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__,

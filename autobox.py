@@ -3,6 +3,7 @@ import threading
 import time
 import traceback
 
+import RPi.GPIO as GPIO
 import requests
 
 import obd
@@ -20,7 +21,17 @@ CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
 
 def camRecorderThread(camRecorder):
+    global fireCamera
+
     camRecorder.start()
+
+    while True:
+        if fireCamera:
+            camRecorder.fire()
+            camRecorder.start()
+            fireCamera = False
+
+
 
 
 def obdThread(obdConnection):
@@ -46,7 +57,7 @@ def obdThread(obdConnection):
                 obdRecorder.watch(obd.commands.SPEED)
                 obdRecorder.watch(obd.commands.THROTTLE_POS)
                 obdRecorder.watch(obd.commands.ENGINE_LOAD)
-                obdRecorder.watch(obd.commands.LONG_FUEL_TRIM_1)
+                obdRecorder.watch(obd.commands.FUEL_LEVEL)
                 obdRecorder.start()
                 was_connected = True
 
@@ -55,7 +66,7 @@ def obdThread(obdConnection):
             speed = obdRecorder.query(obd.commands.SPEED).value
             throttlepos = obdRecorder.query(obd.commands.THROTTLE_POS).value
             engineload = obdRecorder.query(obd.commands.ENGINE_LOAD).value
-            fuellevel = obdRecorder.query(obd.commands.LONG_FUEL_TRIM_1).value
+            fuellevel = obdRecorder.query(obd.commands.FUEL_LEVEL).value
 
 
             obdSlot = ObdObject(
@@ -138,6 +149,17 @@ def failAttempt(attempts, message, status, exception=None):
     return attempts
 
 
+def buttonThread():
+    global buttonPressed
+
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(17, GPIO.IN)
+
+    while True:
+        if not GPIO.input(17):
+            buttonPressed = True  # Will be false when event has been registered
+
+
 # TODO: catch exception in threads and rethrow in main thread (bucket queue?)
 
 if __name__ == '__main__':
@@ -147,8 +169,10 @@ if __name__ == '__main__':
 
         threads = []
 
+        # Global vars
         gpsSlot = None
         obdSlot = None
+        buttonPressed = False
 
         # Camera thread
         cam = CamRecorder()
@@ -169,21 +193,36 @@ if __name__ == '__main__':
         th = threading.Thread(target=postMessages,)
         threads.append(th)
 
+        # Button Thread
+        th = threading.Thread(target=buttonThread,)
+        threads.append(th)
+
         # Start all threads
         for t in threads:
             t.start()
 
+        eventDetected = False
+        fireCamera = False
+
         while True:
+
+            if buttonPressed or (obdSlot is not None and obdSlot.rpm > 3000):  # Threshold EVENT DETECTED!
+                buttonPressed = False  # Reset button status
+                eventDetected = True  # Turned off when log enqueued
+                fireCamera = True     # Turned off when video completes
+
             # gather sensor info each second, write to log, send to ws
-            # TODO: PRIORITY LOG FOR EVENT START/END (no check every x secs)
-            if gpsSlot is not None or obdSlot is not None:
-                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), gpsSlot, obdSlot)
+            if eventDetected or gpsSlot is not None or obdSlot is not None:
+                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), gpsSlot, obdSlot, eventDetected)
+                eventDetected = False
                 # TODO: Serialize (pickle?), save in internal BD?, save in csv?, resend on reconnection?
                 # TODO: how to save tripId in local logs? (internal BD)
                 logger.log_file.write(message.toJSON() + "\n")  # save in json for now
                 print "OBDLOG: " + message.toJSON()
                 logMessages.append(message)
-                time.sleep(CHECK_INTERVAL)
+
+            time.sleep(CHECK_INTERVAL) #sleep out of if!
+
 
     except:
         traceback.print_exc()
