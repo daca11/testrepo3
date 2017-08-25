@@ -1,3 +1,4 @@
+import datetime
 import sys
 import threading
 import time
@@ -24,11 +25,23 @@ def camRecorderThread(camRecorder):
     global fireCamera
 
     camRecorder.start()
+    # p = Process(target=camRecorder.start) #FIXME: EXTERNALIZE watcher! (need shared value)
+    #                                       # , otherwise watcher is killed (not shared memory)
+    # p.start()
+    # p.join()
 
     while True:
-        if fireCamera:
+        if fireCamera: #FIXME: PROCESS VALUE (DECIMAL 0/1)?
             camRecorder.fire()
+            # p = Process(target=camRecorder.fire)
+            # p.start()
+            # p.join()
+
             camRecorder.start()
+            # p = Process(target=camRecorder.start)
+            # p.start()
+            # p.join()
+
             fireCamera = False
 
 
@@ -163,6 +176,9 @@ def buttonThread():
 # TODO: catch exception in threads and rethrow in main thread (bucket queue?)
 
 if __name__ == '__main__':
+    #bug in python2.7, strptime not thread safe
+    throwaway = datetime.datetime.strptime('20110101', '%Y%m%d')
+
     try:
         logger = FileLogger('/home/pi/logs/')
         logMessages = []
