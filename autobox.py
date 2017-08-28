@@ -4,6 +4,7 @@ import sys
 import threading
 import time
 import traceback
+from multiprocessing import Process
 
 import RPi.GPIO as GPIO
 import requests
@@ -16,35 +17,32 @@ from position.gpsPoller import GpsPoller
 from rest.objects import LogMessage, Trip, ObdObject
 
 #'http://192.168.42.13:8080/autologger/rest/',
-WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.108:8080/autologger/rest/']
-CURRENT_WS_URI_ID = 0
+WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.136:8080/autologger/rest/']
+CURRENT_WS_URI_ID = 1
 WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
 
-def camRecorderThread(camRecorder, eventDetected):
-    # global fireCamera
+def camRecorderThread(camRecorder, eventDetected, tripId):
+
+    p = Process(target=camRecorder.archiveFiles, args=(tripId,))
+    p.start()
+    p.join()
 
     camRecorder.start()
-    # p = Process(target=camRecorder.start) #FIXME: EXTERNALIZE watcher! (need shared value)
-    #                                       # , otherwise watcher is killed (not shared memory)
-    # p.start()
-    # p.join()
+
 
     while True:
         eventDetected.wait()
-
+        dateTimeEvent = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
         camRecorder.fire()
-        # p = Process(target=camRecorder.fire)
-        # p.start()
-        # p.join()
+
+        p = Process(target=camRecorder.archiveFiles, args=(tripId,dateTimeEvent,True,))
+        p.start()
+        p.join()
 
         camRecorder.start()
-        # p = Process(target=camRecorder.start)
-        # p.start()
-        # p.join()
 
-        # fireCamera = False
 
 
 
@@ -112,25 +110,25 @@ def postMessages():
     global WS_URIS
 
     attempts = 0
-    tripId = None
+    global tripId
 
     # request a trip id
 
-    while tripId is None:
+    while tripId.value is 0:
         print "Requesting trip id..."
 
         try:
             r = requests.get(WS_URI)
             if r.status_code == 200:
 
-                tripId = r.text
+                tripId.value = int(r.text)
                 attempts = 0
 
                 while True:
                     try:
                         if len(logMessages) != 0:
                             logMsg = logMessages[0]
-                            logMsg.trip = Trip(tripId)
+                            logMsg.trip = Trip(tripId.value)
                             headers = {'content-type': 'application/json'}
                             r = requests.post(WS_URI, data=logMsg.toJSON(), headers=headers)
                             if r.status_code == 200:
@@ -189,6 +187,7 @@ if __name__ == '__main__':
 
         eventDetected = multiprocessing.Event()
         # fireCamera = False
+        tripId = multiprocessing.Value('i', 0)
 
         # Global vars
         gpsSlot = None
@@ -197,7 +196,7 @@ if __name__ == '__main__':
 
         # Camera thread
         cam = CamRecorder()
-        camWorker = multiprocessing.Process(target=camRecorderThread, args=(cam, eventDetected))
+        camWorker = multiprocessing.Process(target=camRecorderThread, args=(cam, eventDetected, tripId))
         camWorker.start()
         # th = threading.Thread(target=camRecorderThread, args=(cam,))
         # threads.append(th)

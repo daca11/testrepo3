@@ -1,18 +1,30 @@
 import glob
 import os
 import subprocess
+import sys
 import time
 import urllib2
 from multiprocessing import Process
 
+import requests
 from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 
 # TODO: read from config file
+from rest.objects import CameraEvent, Trip
+
 MOTION_ROOT_DIR = "/home/pi/motionfiles"
 CAMERAS = 2
 PATTERN = "*.avi"
 SECONDS_POST_CAPTURE = 60
+
+
+#'http://192.168.42.13:8080/autologger/rest/',
+WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.136:8080/autologger/rest/video']
+CURRENT_WS_URI_ID = 1
+WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
+CHECK_INTERVAL = 1
+RETRY_INTERVAL = 5
 
 
 class WatcherHandler(PatternMatchingEventHandler):
@@ -46,7 +58,7 @@ class CamRecorder:
         named like the first video in the directory of that camera
     """
 
-    def archiveFiles(self):
+    def archiveFiles(self, tripId, dateTimeEvent=None, event=False):
         for num_cam in xrange(1, CAMERAS + 1):
             cam_dir = MOTION_ROOT_DIR + "/cam" + str(num_cam)
             new_dir = ""
@@ -70,7 +82,39 @@ class CamRecorder:
                                  shell=True)
                 proc.wait()
                 print "VIDEO JOINED!!!"
-                #TODO: SEND TO WS (if event)
+
+                # SEND TO WS (if event)
+                if event:
+                    p = Process(target=self.sendVideo, args=(tripId, dateTimeEvent, num_cam ))
+                    p.start()
+
+
+    def sendVideo(self, tripId, dateTime, cameraId):
+
+        sent = False
+
+        while tripId.value is 0:
+            print "No trip id to send video..."
+            time.sleep(RETRY_INTERVAL)
+
+        print "Trip ID!: " + str(tripId.value)
+        trip = Trip(tripId.value)
+        cameraEvent = CameraEvent(trip, dateTime, cameraId)
+
+        while not sent:
+            try:
+                headers = {'content-type': 'application/json'}
+                r = requests.post(WS_URI, data=cameraEvent.toJSON(), headers=headers)
+                if r.status_code == 200:
+                    sent = True
+                    print "!!!! VIDEO SENT !!!!"
+                else:
+                    print "Failed sending VIDEO to WS, status: " + str(r.status_code)
+            except:
+                ex_type, ex_value, ex_trace = sys.exc_info()
+                print "Failed sending VIDEO to WS, exception: " + str(ex_value)
+
+            time.sleep(RETRY_INTERVAL)
 
 
     def runProcess(self):
@@ -97,12 +141,6 @@ class CamRecorder:
         urllib2.urlopen("http://localhost:8080/0/config/set?emulate_motion=on").read()
 
     def start(self):
-        #  OPEN IT IN ANOTHER PROCESS AND WAIT TO FINISH
-        p = Process(target=self.archiveFiles)
-        p.start()
-        p.join()
-        # self.archiveFiles()
-
         # schedule a watcher for each camera
         self.observer = Observer()
         for num_cam in xrange(1, CAMERAS + 1):

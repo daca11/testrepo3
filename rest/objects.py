@@ -39,3 +39,14 @@ class LogMessage:
     def toJSON(self):
         return json.dumps(self, default=lambda o: o.__dict__,
                           sort_keys=False, indent=None)
+
+
+class CameraEvent:
+    def __init__(self, trip, time, cameraId):
+        self.trip = trip
+        self.time = time
+        self.cameraId = cameraId
+
+    def toJSON(self):
+        return json.dumps(self, default=lambda o: o.__dict__,
+                          sort_keys=False, indent=None)
