@@ -15,30 +15,30 @@ PATTERN = "*.avi"
 SECONDS_POST_CAPTURE = 60
 
 
-class WatcherHandler(PatternMatchingEventHandler): #TODO: SE ACUMULA! replace with check each 10 secs
-    def __init__(self):
-        super(WatcherHandler, self).__init__()
-        self.counter = 0
+class WatcherHandler(PatternMatchingEventHandler):
+    # def __init__(self):
+    #     super(WatcherHandler, self).__init__()
+        # self.counter = 0
 
     def on_created(self, event):
-        if self.counter % 10 == 0:  # REMOVE WHEN WATCHER EXTERNALIZED!
-            # for each cam (observer), remove the oldest if there is more than two files
-            rootEventPath, eventFile = os.path.split(event.src_path)
-            print "<<< created " + eventFile
-            fileList = sorted(glob.glob1(rootEventPath, PATTERN))
-            while len(fileList) > SECONDS_POST_CAPTURE:
-                fileToRemove = rootEventPath + "/" + fileList.pop(0)  # TODO: join paths with os.join?
-                os.remove(fileToRemove)
-                print ">>> removed " + fileToRemove
+        # if self.counter % 10 == 0:  # REMOVE WHEN WATCHER EXTERNALIZED!
+        # for each cam (observer), remove the oldest if there is more than two files
+        rootEventPath, eventFile = os.path.split(event.src_path)
+        print "<<< created " + eventFile
+        fileList = sorted(glob.glob1(rootEventPath, PATTERN))
+        while len(fileList) > SECONDS_POST_CAPTURE:
+            fileToRemove = rootEventPath + "/" + fileList.pop(0)  # TODO: join paths with os.join?
+            os.remove(fileToRemove)
+            print ">>> removed " + fileToRemove
 
-        self.counter += 1
+        # self.counter += 1
 
 
 class CamRecorder:
     def __init__(self):
         self.process = None
         self.firstRun = True
-        self.observer = Observer()
+        self.observer = None
         # TODO param storage dirs
 
     """
@@ -65,12 +65,12 @@ class CamRecorder:
 
             #join files
             if len(filelist) != 0:
-                proc = subprocess.Popen(["ffmpeg", "-i", "\"concat:" + "|".join(filelist) + "\"", "-c", "copy",
-                                         new_dir +  "/output.avi"], # FIXME: FILENAME TOO LONG, join little chunks?
-                                 shell=False)
+                proc = subprocess.Popen('ffmpeg -i "concat:' + '|'.join(filelist) + '" -c copy ' + new_dir +
+                'outputCam' + str(num_cam) + '.avi',
+                                 shell=True)
                 proc.wait()
                 print "VIDEO JOINED!!!"
-                #TODO: SEND TO WS
+                #TODO: SEND TO WS (if event)
 
 
     def runProcess(self):
@@ -103,13 +103,14 @@ class CamRecorder:
         p.join()
         # self.archiveFiles()
 
+        # schedule a watcher for each camera
+        self.observer = Observer()
+        for num_cam in xrange(1, CAMERAS + 1):
+            self.observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
+
+        self.observer.start()
+
         if self.firstRun:
-            # schedule a watcher for each camera
-            for num_cam in xrange(1, CAMERAS + 1):
-                self.observer.schedule(WatcherHandler(), path=MOTION_ROOT_DIR + "/cam" + str(num_cam))
-
-            self.observer.start()  # TODO: already started???
-
             self.runProcess()
             self.firstRun = False
         else:
@@ -117,25 +118,10 @@ class CamRecorder:
 
         print "**RECORDING**"
 
-    ######################################################
-
-            # while not newEvent:
-            #     key = sys.stdin.read(1)
-            #     if key[0] == "q":
-            #         newEvent = True
-            #         print "New event! starting 1min countdown and stopping observers" # TODO: param seconds of countdown...
-            #         observer.stop()
-            #         observer.join()
-            #         time.sleep(5)
-            #         print "Pausing motion..."
-            #         # killing causes video device busy and skip seconds of recording
-            #         # self.killProcess()
-            #         self.pause()
-
     def fire(self):
-        print ">>>NEW EVENT!<<<"  # TODO: param seconds of countdown...
+        print "-----NEW EVENT!-----"  # TODO: param seconds of countdown...
         self.observer.stop()
-        # self.observer.join()
+        self.observer.join()
         time.sleep(SECONDS_POST_CAPTURE)
         print "**>NOT RECORDING<**"
         self.pause()

@@ -1,4 +1,5 @@
 import datetime
+import multiprocessing
 import sys
 import threading
 import time
@@ -21,8 +22,8 @@ WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
 
-def camRecorderThread(camRecorder):
-    global fireCamera
+def camRecorderThread(camRecorder, eventDetected):
+    # global fireCamera
 
     camRecorder.start()
     # p = Process(target=camRecorder.start) #FIXME: EXTERNALIZE watcher! (need shared value)
@@ -31,18 +32,19 @@ def camRecorderThread(camRecorder):
     # p.join()
 
     while True:
-        if fireCamera: #FIXME: PROCESS VALUE (DECIMAL 0/1)?
-            camRecorder.fire()
-            # p = Process(target=camRecorder.fire)
-            # p.start()
-            # p.join()
+        eventDetected.wait()
 
-            camRecorder.start()
-            # p = Process(target=camRecorder.start)
-            # p.start()
-            # p.join()
+        camRecorder.fire()
+        # p = Process(target=camRecorder.fire)
+        # p.start()
+        # p.join()
 
-            fireCamera = False
+        camRecorder.start()
+        # p = Process(target=camRecorder.start)
+        # p.start()
+        # p.join()
+
+        # fireCamera = False
 
 
 
@@ -185,6 +187,9 @@ if __name__ == '__main__':
 
         threads = []
 
+        eventDetected = multiprocessing.Event()
+        # fireCamera = False
+
         # Global vars
         gpsSlot = None
         obdSlot = None
@@ -192,8 +197,10 @@ if __name__ == '__main__':
 
         # Camera thread
         cam = CamRecorder()
-        th = threading.Thread(target=camRecorderThread, args=(cam,))  # TODO: configure as a daemon...
-        threads.append(th)
+        camWorker = multiprocessing.Process(target=camRecorderThread, args=(cam, eventDetected))
+        camWorker.start()
+        # th = threading.Thread(target=camRecorderThread, args=(cam,))
+        # threads.append(th)
 
         # GPS thread
         gpsp = GpsPoller()
@@ -217,20 +224,18 @@ if __name__ == '__main__':
         for t in threads:
             t.start()
 
-        eventDetected = False
-        fireCamera = False
 
         while True:
 
             if buttonPressed or (obdSlot is not None and obdSlot.rpm > 3000):  # Threshold EVENT DETECTED!
                 buttonPressed = False  # Reset button status
-                eventDetected = True  # Turned off when log enqueued
-                fireCamera = True     # Turned off when video completes
+                eventDetected.set()  # Turned off when log enqueued
+                # fireCamera = True     # Turned off when video completes
 
             # gather sensor info each second, write to log, send to ws
-            if eventDetected or gpsSlot is not None or obdSlot is not None:
-                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), gpsSlot, obdSlot, eventDetected)
-                eventDetected = False
+            if eventDetected.is_set() or gpsSlot is not None or obdSlot is not None:
+                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), gpsSlot, obdSlot, eventDetected.is_set())
+                eventDetected.clear() #maybe if is_set?
                 # TODO: Serialize (pickle?), save in internal BD?, save in csv?, resend on reconnection?
                 # TODO: how to save tripId in local logs? (internal BD)
                 logger.log_file.write(message.toJSON() + "\n")  # save in json for now
@@ -245,6 +250,8 @@ if __name__ == '__main__':
     finally:
         print "HALTING DOWN!"
         cam.killProcess()  # Kill motion to stop recording
+        camWorker.terminate()
+
         gpsp.closeFile()  # Flush gps logfile
         # obdConn.closeFile()  # Flush obd logfile
         obdConn.killProcess()  # Disconnect from obd bt
