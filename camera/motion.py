@@ -20,8 +20,8 @@ SECONDS_POST_CAPTURE = 60
 
 
 #'http://192.168.42.13:8080/autologger/rest/',
-WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.136:8080/autologger/rest/video']
-CURRENT_WS_URI_ID = 1
+WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.136:8080/autologger/rest/']
+CURRENT_WS_URI_ID = 0
 WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
@@ -77,8 +77,8 @@ class CamRecorder:
 
             #join files
             if len(filelist) != 0:
-                proc = subprocess.Popen('ffmpeg -i "concat:' + '|'.join(filelist) + '" -c copy ' + new_dir +
-                'outputCam' + str(num_cam) + '.avi',
+                proc = subprocess.Popen('ffmpeg -i "concat:' + '|'.join(filelist) + '" -c copy ' + new_dir + '/' +
+                                        'outputCam' + str(num_cam) + '.avi',
                                  shell=True)
                 proc.wait()
                 print "VIDEO JOINED!!!"
@@ -104,7 +104,7 @@ class CamRecorder:
         while not sent:
             try:
                 headers = {'content-type': 'application/json'}
-                r = requests.post(WS_URI, data=cameraEvent.toJSON(), headers=headers)
+                r = requests.post(WS_URI+"video", data=cameraEvent.toJSON(), headers=headers)
                 if r.status_code == 200:
                     sent = True
                     print "!!!! VIDEO SENT !!!!"

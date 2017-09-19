@@ -18,7 +18,7 @@ from rest.objects import LogMessage, Trip, ObdObject
 
 #'http://192.168.42.13:8080/autologger/rest/',
 WS_URIS = ['http://dalexa.no-ip.biz:8080/autologger/rest/', 'http://192.168.1.136:8080/autologger/rest/']
-CURRENT_WS_URI_ID = 1
+CURRENT_WS_URI_ID = 0
 WS_URI = WS_URIS[CURRENT_WS_URI_ID]  # switch global/local ip
 CHECK_INTERVAL = 1
 RETRY_INTERVAL = 5
@@ -34,7 +34,7 @@ def camRecorderThread(camRecorder, eventDetected, tripId):
 
     while True:
         eventDetected.wait()
-        dateTimeEvent = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+        dateTimeEvent = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
         camRecorder.fire()
 
         p = Process(target=camRecorder.archiveFiles, args=(tripId,dateTimeEvent,True,))
@@ -70,7 +70,7 @@ def obdThread(obdConnection):
                 obdRecorder.watch(obd.commands.SPEED)
                 obdRecorder.watch(obd.commands.THROTTLE_POS)
                 obdRecorder.watch(obd.commands.ENGINE_LOAD)
-                obdRecorder.watch(obd.commands.FUEL_LEVEL)
+                #obdRecorder.watch(obd.commands.FUEL_LEVEL)
                 obdRecorder.start()
                 was_connected = True
 
@@ -79,8 +79,8 @@ def obdThread(obdConnection):
             speed = obdRecorder.query(obd.commands.SPEED).value
             throttlepos = obdRecorder.query(obd.commands.THROTTLE_POS).value
             engineload = obdRecorder.query(obd.commands.ENGINE_LOAD).value
-            fuellevel = obdRecorder.query(obd.commands.FUEL_LEVEL).value
-
+            #fuellevel = obdRecorder.query(obd.commands.FUEL_LEVEL).value
+            fuellevel = None
 
             obdSlot = ObdObject(
                 rpm.magnitude if rpm is not None else None,
@@ -141,8 +141,8 @@ def postMessages():
             else:
                 attempts = failAttempt(attempts, "Failed requesting tripId to WS", r.status_code)
         except:
-            CURRENT_WS_URI_ID = 0 if CURRENT_WS_URI_ID == 1 else 1
-            WS_URI = WS_URIS[CURRENT_WS_URI_ID]
+#            CURRENT_WS_URI_ID = 0 if CURRENT_WS_URI_ID == 1 else 1
+#            WS_URI = WS_URIS[CURRENT_WS_URI_ID]
             attempts = failAttempt(attempts, "Failed requesting tripId to WS", None, sys.exc_info())
 
 
@@ -233,7 +233,7 @@ if __name__ == '__main__':
 
             # gather sensor info each second, write to log, send to ws
             if eventDetected.is_set() or gpsSlot is not None or obdSlot is not None:
-                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), gpsSlot, obdSlot, eventDetected.is_set())
+                message = LogMessage(time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()), gpsSlot, obdSlot, eventDetected.is_set())
                 eventDetected.clear() #maybe if is_set?
                 # TODO: Serialize (pickle?), save in internal BD?, save in csv?, resend on reconnection?
                 # TODO: how to save tripId in local logs? (internal BD)
@@ -246,6 +246,7 @@ if __name__ == '__main__':
 
     except:
         traceback.print_exc()
+        print "EXCEPTION!"
     finally:
         print "HALTING DOWN!"
         cam.killProcess()  # Kill motion to stop recording
